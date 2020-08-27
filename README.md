@@ -6,4 +6,5 @@ These are the questions we are trying to figure out during this project:
   2. Based on the world average CO2 emission levels, we want to classify the emission level into high and low levels
   3. From the results attained by our models, we want to bring some specific and practical suggestions of greenhouse emission and environment protection. 
   4. The models we used in the project are: 
-     multiple regression, logistic regression, KNN, decision tree,
+     multiple regression, logistic regression, KNN, decision tree, HierCluster and K-means clustering.
+     Each model has its corresponding file containing the code and csv files.
