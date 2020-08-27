@@ -1,0 +1,114 @@
+---
+title: "Logistic Reg"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r cars}
+library(readr)
+library(caret)
+library(dummies)
+co2 <- read_csv("new co2.csv")
+```
+
+
+
+```{r pressure, echo=FALSE}
+#change y to categorical
+co2$Y_Categorical =  ifelse(as.vector(co2$Total.greenhouse.gas.emissions.per.capita.t.of.CO2.equivalent.) > 5.0, 1, 0)
+co2$Y_Emission_Level =  ifelse(as.vector(co2$Total.greenhouse.gas.emissions.per.capita.t.of.CO2.equivalent.) > 5.0,'High', 'Low')
+
+attach(mtcars)
+par(mfrow=c(2,2))
+boxplot(co2$Total.greenhouse.gas.emissions.per.capita.t.of.CO2.equivalent., main="Total Co2 Emission")
+boxplot(co2$Energy.use..kg.of.oil.equivalent.per.capita., main="Energy Use")
+hist(co2$HierCluster.Label, main = 'Distribution of HierCluster')
+hist(co2$KmeansCluster.Labels, main = 'Distribution of KmeansCluster')
+
+```
+
+```{r}
+# generate dummies
+Hier.f <- factor(co2$HierCluster.Label)
+dummies <- model.matrix(~Hier.f)
+
+k.f <- factor(co2$KmeansCluster.Labels)
+dummies2 <- model.matrix(~k.f)
+
+co2 <- cbind(co2, dummies, dummies2)
+```
+
+
+```{r}
+set.seed(2)
+train.index <- sample(c(1:dim(co2)[1]), dim(co2)[1]*0.6)  
+train.df <- co2[train.index, ]
+valid.df <- co2[-train.index, ]
+```
+# review previous logit model
+```{r}
+logit.reg2 <- glm(Y_Categorical~Energy.use..kg.of.oil.equivalent.per.capita.,data = train.df, family = binomial(link = "logit")) 
+summary(logit.reg2)
+pred2 <- predict(logit.reg2, valid.df)
+m2 <- confusionMatrix(as.factor(ifelse(pred2 > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m2)
+m2$byClass
+```
+
+```{r}
+logit.hier <- glm(Y_Categorical~Energy.use..kg.of.oil.equivalent.per.capita.+Hier.f2+Hier.f3+Hier.f4+Hier.f5,data = train.df, family = binomial(link = "logit")) 
+summary(logit.hier)
+pred.hier <- predict(logit.hier, valid.df)
+m.hier <- confusionMatrix(as.factor(ifelse(pred.hier > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m.hier)
+m.hier$byClass
+```
+
+```{r}
+logit.k <- glm(Y_Categorical~Energy.use..kg.of.oil.equivalent.per.capita.+ k.f2+k.f3+k.f4+k.f5,data = train.df, family = binomial(link = "logit")) 
+summary(logit.k)
+pred.k <- predict(logit.k, valid.df)
+m.k <- confusionMatrix(as.factor(ifelse(pred.k > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m.k)
+m.k$byClass
+```
+
+```{r}
+logit.c <- glm(Y_Categorical~Energy.use..kg.of.oil.equivalent.per.capita.+ Hier.f2+Hier.f3+Hier.f4+Hier.f5+ k.f2+k.f3+k.f4+k.f5,data = train.df, family = binomial(link = "logit")) 
+summary(logit.c)
+pred.c <- predict(logit.c, valid.df)
+m.c <- confusionMatrix(as.factor(ifelse(pred.c > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m.c)
+m.c$byClass
+```
+
+```{r}
+plot(logit.reg2)
+plot(logit.hier)
+plot(logit.k)
+plot(logit.c)
+
+```
+
+```{r}
+plot(logit.reg2$residuals)
+plot(logit.hier$residuals)
+plot(logit.k$residuals)
+plot(logit.c$residuals)
+```
+
+
+
+
+
+
+
+
+
+
+

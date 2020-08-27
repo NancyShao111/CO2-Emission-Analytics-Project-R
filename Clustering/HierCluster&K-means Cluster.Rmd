@@ -1,0 +1,190 @@
+---
+title: "Clustering-CO2"
+date: 'Spring 2020'
+---
+
+```{r, warning=FALSE,message=FALSE}
+library(readr)
+library(dbplyr)
+co2 <- read_csv("co2.csv")
+co2 <- data.frame(co2)
+```
+
+# HierCluster
+```{r,warning=FALSE,message=FALSE}
+# set row names to the country_name column
+row.names(co2) <- co2[,1]
+# remove the country_name column
+co2 <- co2[,-1]
+# normalize input variables
+co2.norm <- data.frame(sapply(co2, scale))
+# add row names: country_name
+row.names(co2.norm) <- row.names(co2) 
+
+# compute normalized distance based on all 28 variables
+d.1.norm <- dist(co2.norm, method = "euclidean")
+# try different methods for computing distance: "maximum", "manhattan", "canberra", "binary" or "minkowski"
+d.2.norm <- dist(co2.norm, method = "maximum")
+d.3.norm <- dist(co2.norm, method = "manhattan")
+d.4.norm <- dist(co2.norm, method = "canberra")
+d.5.norm <- dist(co2.norm, method = "binary")
+d.6.norm <- dist(co2.norm, method = "minkowski")
+
+# in hclust() set argument method =  to "ward.D", "single", "complete", "average", "median", or "centroid"
+hc1 <- hclust(d.1.norm, method = "single")
+plot(hc1, hang = -1, ann = FALSE)
+
+hc2 <- hclust(d.1.norm, method = "average")
+plot(hc2, hang = -1, ann = FALSE)
+
+hc3 <- hclust(d.1.norm, method = "median")
+plot(hc3, hang = -1, ann = FALSE)
+
+hc4 <- hclust(d.1.norm, method = "complete")
+plot(hc4, hang = -1, ann = FALSE)
+
+hc5 <- hclust(d.1.norm, method = "centroid")
+plot(hc5, hang = -1, ann = FALSE)
+
+hc6 <- hclust(d.1.norm, method = "ward.D")
+plot(hc6, hang = -1, ann = FALSE)
+
+```
+
+```{r}
+memb1 <- cutree(hc1, k = 5)
+memb1
+
+memb2 <- cutree(hc2, k = 5)
+memb2
+
+memb3 <- cutree(hc3, k = 5)
+memb3
+
+memb4 <- cutree(hc4, k = 5)
+memb4
+
+memb5 <- cutree(hc5, k = 5)
+memb5
+
+memb6 <- cutree(hc6, k = 5)
+memb6
+```
+
+```{r}
+# Use cat() function to capture the cluster numbers without the row names and without line numbers:
+cat(memb1)
+cat(memb2)
+cat(memb3)
+cat(memb4)
+cat(memb5)
+cat(memb6)
+
+hist(memb1)
+hist(memb2)
+hist(memb3)
+hist(memb4)
+hist(memb5)
+hist(memb6)
+
+
+```
+
+```{r}
+# set labels as cluster membership number
+row.names(co2.norm) <- paste(memb6, ": ", row.names(co2), sep = "")
+```
+
+```{r}
+# plot heatmap 
+# rev() reverses the color mapping to large = dark
+heatmap(as.matrix(co2.norm), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("grey",1:99,sep="")))
+```
+
+
+
+# K-means clustering
+
+```{r setup, include=FALSE}
+library(readr)
+library(caret)
+library(class)
+library(dclust)
+```
+
+
+
+```{r pressure, echo=FALSE}
+co2 <- read_csv("co2.csv")
+co2.df<-data.frame(co2)
+row.names(co2.df) <- co2.df[,1]
+co2.df <- co2.df[,-1]
+co2.df.norm <- sapply(co2.df, scale)
+```
+```{r}
+ratio_ss <- rep(0, 10)
+
+for (k in 1:10) {
+  co2_km <- kmeans(co2.df.norm , k, nstart = 20)
+  ratio_ss[k] <- co2_km$tot.withinss / co2_km$totss
+  
+}
+
+plot(ratio_ss, type = "b", xlab = "k")
+
+```
+```{r}
+km<-kmeans(co2.df.norm, 5,nstart= 20)
+km$cluster
+cat(km$cluster)
+km$centers
+```
+
+```{r}
+# plot an empty scatter plot
+plot(c(0), xaxt = 'n', ylab = "", type = "l", 
+     ylim = c(min(km$centers), max(km$centers)), xlim = c(0, 28))
+
+axis(1, at = c(1:28), labels = names(co2.df))
+
+                                                                                                     
+# plot centroids 
+for (i in c(1:5))
+  lines(km$centers[i,], lty = i, lwd = 2, col = switch(i, "black", "red", 
+                                                       "green", "purple","yellow"))
+                                                       
+                                                       
+# name clusters
+text(x = 0.5, y = km$centers[, 1], labels = paste("Cluster", c(1:5)))
+
+dist(km$centers)
+
+# yet another approach: divisive (top-down) with k-means to try to capture both large and small clusters
+d.norm <- dist(co2.df.norm, method = "euclidean")  
+hybrid <- dclust(d.norm, method = "kmeans", stand = TRUE)
+plot(hybrid, ann = FALSE)
+
+```
+
+
+```{r}
+# Add HierCluster and KmeansCluster variables to the dataset
+co2 <- data.frame(co2)
+co2 <- cbind(co2,memb6)
+names(co2)[names(co2) == 'memb6'] <- 'HierCluster.Label'
+co2<- cbind(co2, km$cluster)
+names(co2)[names(co2) == 'km$cluster'] <- 'KmeansCluster.Labels'
+str(co2)
+write.csv(co2,"new co2.csv")
+```
+
+
+
+
+
+
+
+
+
+
