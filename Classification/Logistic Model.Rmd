@@ -1,0 +1,89 @@
+---
+title: "Logit-CO2"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+start.time <- Sys.time()
+library(readr)
+library(caret)
+library(caTools)
+co2 <- read_csv("co2.csv")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+co2$Y_Categorical =  ifelse(as.vector(co2$`Total greenhouse gas emissions per capita(t of CO2 equivalent)`) > 5.0, 1, 0)
+co2$Y_Emission_Level =  ifelse(as.vector(co2$`Total greenhouse gas emissions per capita(t of CO2 equivalent)`) > 5.0,'High', 'Low')
+co2$Interact<-  I(( co2$`Energy use (kg of oil equivalent per capita)`- mean( co2$`Energy use (kg of oil equivalent per capita)`)  )* (co2$`Mortality rate, under-5 (per 1,000 live births)`- mean( co2$`Mortality rate, under-5 (per 1,000 live births)`)))
+```
+
+
+
+```{r}
+set.seed(2)
+train.index <- sample(c(1:dim(co2)[1]), dim(co2)[1]*0.6)  
+train.df <- co2[train.index, ]
+valid.df <- co2[-train.index, ]
+```
+
+
+```{r}
+logit.reg <- glm(`Y_Categorical`~  
+`Urban population (% of total population)`  + 
+`Population growth (annual %)` +    
+`Mortality rate, under-5 (per 1,000 live births)` +                               
+`Primary completion rate, total (% of relevant age group)`  +                           
+`Population in urban agglomerations of more than 1 million (% of total population)` +
+`Energy use (kg of oil equivalent per capita)` +                                   
+`Electric power consumption (kWh per capita)`  +                                   
+`Energy use (kg of oil equivalent) per $1,000 GDP (constant 2011 PPP)` +         
+`Renewable electricity output (% of total electricity output)` +  
+`Interact`, data = train.df, family = binomial(link = "logit")) 
+options(scipen=999)
+summary(logit.reg)
+
+```
+
+```{r}
+pred <- predict(logit.reg, valid.df)
+m <- confusionMatrix(as.factor(ifelse(pred > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m)
+```
+
+
+```{r}
+m$byClass
+```
+
+```{r}
+logit.reg2 <- glm(`Y_Categorical`~  
+`Energy use (kg of oil equivalent per capita)`,data = train.df, family = binomial(link = "logit")) 
+summary(logit.reg2)
+pred2 <- predict(logit.reg2, valid.df)
+m2 <- confusionMatrix(as.factor(ifelse(pred2 > 0.5, 1, 0)), as.factor(valid.df$Y_Categorical))
+print(m2)
+m2$byClass
+```
+
+
+```{r}
+plot(logit.reg)
+plot(logit.reg2)
+plot(logit.reg$residuals)
+plot(logit.reg2$residuals)
+exp(coef(logit.reg2))
+colAUC(pred2,valid.df$Y_Categorical, plotROC = T)
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+

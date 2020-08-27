@@ -1,0 +1,87 @@
+---
+title: "Classification Tree-CO2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+start.time <- Sys.time()
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(caret)
+library(e1071)
+library(rpart)
+library(rpart.plot)
+```
+
+## Data Loading and Processing
+
+```{r}
+co2 <- read_csv("co2.csv")
+co2$Y_Emission_Level =  ifelse(as.vector(co2$`Total greenhouse gas emissions per capita(t of CO2 equivalent)`) > 5.0, 'High', 'Low')
+co2$Y_Categorical =  ifelse(as.vector(co2$`Total greenhouse gas emissions per capita(t of CO2 equivalent)`) > 5.0, 1, 0)   #5 is the world avg emission per capita value
+
+#Remove unnecessary variables
+
+co2 <- co2[, -c(1, 13, 14)]
+ 
+```
+
+## Create Random  Dataset
+```{r}
+
+set.seed(1)
+sample_rows <- sample(nrow(co2), nrow(co2) * 0.75)
+train <- co2[sample_rows, ] # Training dataset
+test <- co2[-sample_rows, ] # Test dataset
+```
+
+## Model Creation
+```{r}
+# Use 10-fold cross validation to fix the problem that the number of observations is low
+
+model1 = rpart(Y_Emission_Level~., data = train, 
+              xval = 10, method = "class")
+rpart.plot(model1, main = "Default Model")
+
+model2 = rpart(Y_Emission_Level~., data = train, 
+              xval = 10, cp = 0.00001, minsplit = 1, method = "class")
+rpart.plot(model2, main = "Deep Model without Pruning")
+
+
+```
+
+
+
+## Prediction
+```{r}
+test_pred1 <- predict(model1, test, type = "class")
+confusion_matrix1 <- confusionMatrix(test_pred1, as.factor(test$Y_Emission_Level)) #Confusion matrix
+
+test_pred2 <- predict(model2, test, type = "class")
+confusion_matrix2 <- confusionMatrix(test_pred2, as.factor(test$Y_Emission_Level)) #Confusion matrix
+
+confusion_matrix1
+confusion_matrix2
+
+```
+
+
+
+## Find the best parameter
+```{r}
+printcp(model2)
+pruned_model <- prune(model2, cp = model2$cptable[which.min(model2$cptable[,"xerror"]), "CP"])
+rpart.plot(pruned_model)
+test_pred3 <- predict(pruned_model, test, type = "class")
+confusion_matrix3 <- confusionMatrix(test_pred3, as.factor(test$Y_Emission_Level)) #Confusion matrix
+confusion_matrix3
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+
+
+
+
