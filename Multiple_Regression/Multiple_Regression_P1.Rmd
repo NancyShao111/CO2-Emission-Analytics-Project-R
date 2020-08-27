@@ -1,0 +1,132 @@
+---
+title: "Multiple Regression Part1"
+date: "Spring 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+library(readr)
+library(lmtest)
+library(sandwich)
+library(car)
+library(tidyverse)
+library(ggplot2)
+library(leaps)
+library(forecast)
+```
+
+
+```{r, message=FALSE, echo=TRUE}
+Data <- read_csv("Big_Data.csv")
+Data = Data[-1]
+Data <- as.data.frame(Data)
+```
+
+
+# Part 2. Predictive Modeling: Multiple Regression.
+### 1. Perform Multiple Regression.
+### Select a target variable (numeric, continuous variable) to model. Use forward selection, backward selection, forward-and-backward selection, or best subset (exhaustive) search.
+
+### 2. What is the adjusted R-Squared value of your best model? What is the RMSE? Include some diagnostic residual plots with your final, best model, to show that you have minimized outliers.
+
+```{r}
+#identify the length of training set
+data.nTrain = round(nrow(Data)*0.7)
+#partition data
+set.seed(1)
+data.train = Data[1:data.nTrain,]
+data.valid = Data[-(1:data.nTrain),]
+```
+We divide the whole data set into two parts, training set (70%) and validation set (30%). We use the training set to estimate our model and use validation set to evaluate model's performance.
+
+```{r}
+#use lm() function to do the linear regression of Total greenhouse gas emissions per capita
+reg_1 = lm(`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`~.,data.train)
+summary(reg_1)
+```
+After running the first regression, we find out *Rural population living in areas where elevation is below 5 meters (% of total population)* is not defined because of singularities. Singularity exists when there is perfect correlation between explanatory variables. We will remove it in the later regression.
+
+```{r}
+#remove the undefined variable
+reg_2 = lm(`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`~. -`Rural population living in areas where elevation is below 5 meters (% of total population)`,data.train)
+summary(reg_2)
+```
+
+
+```{r}
+accuracy(reg_2)
+```
+
+Then, we want to check the VIF value of each variable. 
+```{r}
+vif(reg_2)
+```
+
+The smallest possible value of VIF is 1 which is absence of multicollinearity. If the VIF value exceeds 5 or 10, it shows a problematic amount of collinearity .When faced to multicollinearity, the concerned variables should be removed, since the presence of multicollinearity implies that the information that this variable provides about the response is redundant in the presence of the other variables. Therefore, we are going to remove the variables whose VIFs are above 5 and do the regression again.
+```{r}
+reg_3 = lm(`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`~. -`Rural population living in areas where elevation is below 5 meters (% of total population)`-`Urban population (% of total population)`-`Urban population growth (annual %)`-`Population, total`-`Population growth (annual %)`-`Mortality rate, under-5 (per 1,000 live births)`- `Population living in areas where elevation is below 5 meters (% of total population)`-`Urban population living in areas where elevation is below 5 meters (% of total population)`-`Total greenhouse gas emissions (kt of CO2 equivalent)`-`Energy use (kg of oil equivalent per capita)`-`Electric power consumption (kWh per capita)`-`Renewable energy consumption (% of total final energy consumption)`-`Access to electricity (% of population)`,data.train)
+summary(reg_3)
+vif(reg_3)
+```
+
+After excluding the variables whose VIFs are above 5, we find out the R-squared value is very low. We are considering if we removed some variables that can greatly explain the Y. Since VIFs between 5 and 10 are considered to be moderately high, but still acceptable. We decide to remain variables whose VIFs are above 5 and below 10 to do the regression again.
+```{r}
+reg_4 = lm(`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`~. -`Rural population living in areas where elevation is below 5 meters (% of total population)`-`Urban population growth (annual %)`-`Population, total`-`Population growth (annual %)`-`Mortality rate, under-5 (per 1,000 live births)`- `Population living in areas where elevation is below 5 meters (% of total population)`-`Urban population living in areas where elevation is below 5 meters (% of total population)`-`Total greenhouse gas emissions (kt of CO2 equivalent)`,data.train)
+summary(reg_4)
+vif(reg_4)
+```
+Most variables' VIFs are below 5 and others are between 5 and 10 which are acceptable. Our R-squred value improves which means we "saved" some useful variables in the model.
+
+```{r}
+#plot some graphs to diagnostics, such as Residuals vs. Fitted Values and QQ graph
+plot(reg_4)
+```
+
+Use predict() to make predictions on validation set
+```{r}
+reg_4_pred = predict(reg_4, data.valid)
+reg_4_residuals = data.valid$`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`-reg_4_pred
+accuracy(reg_4_pred,data.valid$`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`)
+hist(reg_4_residuals,breaks = 12, xlab = "Residuals", main = "")
+grid()
+```
+intial model reg_2 (all variables except the undefined one):
+Multiple R-squared:  0.4406,	Adjusted R-squared:  0.3163
+RMSE:8.808403
+
+for reg_4:
+Multiple R-squared:  0.396,	Adjusted R-squared:  0.3035 
+RMSE: 7.461446
+
+RMSE decreases, while  two R-squared values decrease a little bit.
+
+
+### Backward selection.
+```{r}
+reg_4_step = step(reg_2,direction = 'backward')
+summary(reg_4_step)
+vif(reg_4_step)
+accuracy(reg_4_step)
+```
+The model attained by the backward selection code still has some variables whose VIFs are above 5, but the largest VIF is 6.118024 and most variables' VIFs are below 5 which is good.
+
+```{r}
+plot(reg_4_step)
+```
+
+```{r}
+#using prediction function on the validation set
+reg_4_step_pred <- predict(reg_4_step,data.valid)
+accuracy(reg_4_step_pred, data.valid$`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`)
+#residuals
+reg_4_residuals_step = data.valid$`Total greenhouse gas emissions per capita(kt of CO2 equivalent)`-reg_4_step_pred
+hist(reg_4_residuals_step,breaks = 12, xlab = "Residuals", main = "")
+grid()
+```
+
+
